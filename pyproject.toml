@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+
+[project]
+name = "ml-inference-platform"
+version = "0.1.0"
+description = "A scalable ML inference platform"
+authors = [{name = "Author", email = "author@example.com"}]
+dependencies = [
+    "fastapi>=0.68.0",
+    "uvicorn>=0.15.0",
+    "pydantic>=1.8.0"
+]

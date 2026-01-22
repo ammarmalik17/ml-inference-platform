@@ -1,0 +1,23 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "ML Inference Metrics",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Requests",
+        "type": "graph"
+      },
+      {
+        "id": 2,
+        "title": "Latency",
+        "type": "graph"
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "graph"
+      }
+    ]
+  }
+}
