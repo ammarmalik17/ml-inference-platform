@@ -2,17 +2,13 @@ import time
 import logging
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, File, UploadFile, Query
+from fastapi import FastAPI, HTTPException, File, UploadFile, Query
 from fastapi.responses import JSONResponse
 from typing import Dict, Any
-import asyncio
-from .dependencies import get_model, ModelRegistry
+from .dependencies import ModelRegistry
 from .schemas import PredictionRequest, PredictionResponse, HealthResponse
-from typing import Optional
 from .inference import predict, predict_async
-from functools import partial
 from .metrics import collect_metrics, record_request_metric
-from ultralytics import YOLO
 
 
 # Configure logging
@@ -70,7 +66,7 @@ async def add_process_time_header(request, call_next):
             record_request_metric(process_time, is_error=response.status_code >= 400)
         response.headers["X-Process-Time"] = str(process_time)
         return response
-    except Exception as e:
+    except Exception:
         process_time = time.time() - start_time
         record_request_metric(process_time, is_error=True)
         raise
@@ -227,7 +223,7 @@ async def load_model(model_name: str) -> Dict[str, Any]:
     """Load a specific model into memory"""
     try:
         registry = ModelRegistry()
-        model = registry.load_model(model_name)
+        registry.load_model(model_name)
         return {
             "status": "success",
             "model_loaded": model_name,

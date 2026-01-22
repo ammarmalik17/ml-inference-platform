@@ -1,8 +1,7 @@
 import os
 from typing import Generator
 from ultralytics import YOLO
-from .optimize import optimize_model_for_inference, quantize_model_for_inference
-
+from .optimize import optimize_model_for_inference
 
 import threading
 from collections import OrderedDict
