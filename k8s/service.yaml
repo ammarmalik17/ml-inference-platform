@@ -4,8 +4,6 @@ metadata:
   name: ml-inference-service
   labels:
     app: ml-inference-service
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"  # Use Network Load Balancer for low latency
 spec:
   selector:
     app: ml-inference-app
@@ -13,4 +11,8 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 8000
+      name: http-api
   type: LoadBalancer
+  # Optional: Uncomment and configure based on cloud provider requirements
+  # annotations:
+  #   service.beta.kubernetes.io/aws-load-balancer-type: "nlb"  # Use Network Load Balancer for low latency

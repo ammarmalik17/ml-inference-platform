@@ -3,7 +3,6 @@ from typing import Generator
 from ultralytics import YOLO
 import threading
 from collections import OrderedDict
-import sys
 from pathlib import Path
 
 
