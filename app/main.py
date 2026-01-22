@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
     try:
         # Initialize model registry during startup
         registry = ModelRegistry()
-        model_path = os.getenv("MODEL_PATH", "yolo11n-cls.pt")
+        model_path = os.getenv("MODEL_PATH", "model_files/yolo11n-cls.pt")
         registry.get_model(model_path)  # Initialize default model
         logger.info("Model loaded successfully")
     except Exception as e:

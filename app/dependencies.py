@@ -1,10 +1,10 @@
 import os
 from typing import Generator
 from ultralytics import YOLO
-from .optimize import optimize_model_for_inference
-
 import threading
 from collections import OrderedDict
+import sys
+from pathlib import Path
 
 
 class ModelRegistry:
@@ -26,7 +26,7 @@ class ModelRegistry:
     def get_model(self, model_path: str = None):
         """Get or create a YOLO model instance by path"""
         if model_path is None:
-            model_path = os.getenv("MODEL_PATH", "yolo11n-cls.pt")
+            model_path = os.getenv("MODEL_PATH", "model_files/yolo11n-cls.pt")
         
         with self._lock:
             if model_path in self._models:
@@ -35,7 +35,20 @@ class ModelRegistry:
                 return self._models[model_path]
             else:
                 # Load new model with optimization for inference
-                model = optimize_model_for_inference(model_path)
+                # Ensure model_path uses the model_files directory
+                if not model_path.startswith(('http://', 'https://')) and not os.path.isabs(model_path):
+                    # If it's a model name like 'yolo11n-cls.pt', we need to ensure it downloads to model_files
+                    model_filename = os.path.basename(model_path)
+                    model_files_path = Path("model_files") / model_filename
+                    
+                    # Create model_files directory if it doesn't exist
+                    model_files_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Update model_path to point to model_files directory
+                    model_path = str(model_files_path)
+                
+                # Load model directly with YOLO
+                model = YOLO(model_path)
                 self._models[model_path] = model
                 
                 # If we exceed the limit, remove the oldest model
