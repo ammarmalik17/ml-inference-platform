@@ -193,6 +193,22 @@ async def general_exception_handler(request, exc):
 
 
 # Additional utility endpoints
+def convert_tensor_to_serializable(obj):
+    """Convert torch tensors and other non-serializable objects to serializable types"""
+    if hasattr(obj, 'cpu') and hasattr(obj, 'tolist'):  # torch tensor
+        try:
+            return obj.cpu().tolist()
+        except:
+            return str(obj)
+    elif hasattr(obj, 'item'):  # numpy scalar
+        return obj.item()
+    elif isinstance(obj, dict):
+        return {k: convert_tensor_to_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_tensor_to_serializable(item) for item in obj]
+    else:
+        return obj
+
 @app.get("/model/info")
 async def model_info(model_path: str = Query(None, description="Path to the model to get info for")) -> Dict[str, Any]:
     """Get information about the currently active model"""
@@ -202,8 +218,8 @@ async def model_info(model_path: str = Query(None, description="Path to the mode
     return {
         "model_type": type(model).__name__,
         "model_names": model.names if hasattr(model, 'names') else {},
-        "task": getattr(model, 'task', 'unknown'),
-        "stride": getattr(model, 'stride', 'unknown')
+        "task": convert_tensor_to_serializable(getattr(model, 'task', 'unknown')),
+        "stride": convert_tensor_to_serializable(getattr(model, 'stride', 'unknown'))
     }
 
 

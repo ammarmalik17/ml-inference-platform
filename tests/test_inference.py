@@ -78,6 +78,11 @@ def test_perform_classification_with_mock_model():
     mock_result.probs.top5 = [0, 1, 2]  # Top 3 classes
     mock_result.probs.top5conf = [0.8, 0.15, 0.05]  # Confidence scores
     
+    # Mock the model call to return the mock result
+    def mock_model_call(*args, **kwargs):
+        return [mock_result]
+    
+    mock_model.side_effect = mock_model_call
     mock_model.return_value = [mock_result]
     
     # Create a dummy image
@@ -103,24 +108,32 @@ def test_perform_detection_with_mock_model():
     mock_model.names = {0: "person", 1: "car", 2: "tree"}
     
     # Create mock boxes for detection
+    # According to the code, box.xyxy[0] needs to have a .tolist() method
+    mock_xyxy1 = Mock()
+    mock_xyxy1.tolist = Mock(return_value=[10, 10, 100, 100])  # The full bbox coordinates as a list
     mock_box1 = Mock()
     mock_box1.conf = [0.9]
     mock_box1.cls = [0]
-    mock_box1.xyxy = [[10, 10, 100, 100]]  # [x1, y1, x2, y2]
+    mock_box1.xyxy = [mock_xyxy1]  # xyxy should be a list where [0] is the coordinate array
     
+    mock_xyxy2 = Mock()
+    mock_xyxy2.tolist = Mock(return_value=[200, 200, 300, 300])  # The full bbox coordinates as a list
     mock_box2 = Mock()
     mock_box2.conf = [0.75]
     mock_box2.cls = [1]
-    mock_box2.xyxy = [[200, 200, 300, 300]]
+    mock_box2.xyxy = [mock_xyxy2]  # xyxy should be a list where [0] is the coordinate array
     
-    mock_boxes = Mock()
-    mock_boxes.__iter__ = Mock(return_value=iter([mock_box1, mock_box2]))
-    mock_boxes.__getitem__ = lambda _, idx: [mock_box1, mock_box2][idx]
-    mock_boxes.__len__ = lambda _: 2
+    # Create mock boxes container
+    mock_boxes = [mock_box1, mock_box2]
     
     mock_result = Mock()
     mock_result.boxes = mock_boxes
     
+    # Mock the model call to return the mock result
+    def mock_model_call(*args, **kwargs):
+        return [mock_result]
+    
+    mock_model.side_effect = mock_model_call
     mock_model.return_value = [mock_result]
     
     # Create a dummy image
@@ -191,15 +204,16 @@ def test_predict_function_detection():
     mock_model.names = {0: "person", 1: "car"}
     
     # Create mock boxes for detection
+    # According to the code, box.xyxy[0] needs to have a .tolist() method
+    mock_xyxy1 = Mock()
+    mock_xyxy1.tolist = Mock(return_value=[10, 10, 100, 100])  # The full bbox coordinates as a list
     mock_box1 = Mock()
     mock_box1.conf = [0.9]
     mock_box1.cls = [0]
-    mock_box1.xyxy = [[10, 10, 100, 100]]
+    mock_box1.xyxy = [mock_xyxy1]  # xyxy should be a list where [0] is the coordinate array
     
-    mock_boxes = Mock()
-    mock_boxes.__iter__ = Mock(return_value=iter([mock_box1]))
-    mock_boxes.__getitem__ = lambda _, idx: [mock_box1][idx]
-    mock_boxes.__len__ = lambda _: 1
+    # Create mock boxes container
+    mock_boxes = [mock_box1]
     
     mock_result = Mock()
     mock_result.boxes = mock_boxes
