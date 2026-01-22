@@ -198,7 +198,7 @@ def convert_tensor_to_serializable(obj):
     if hasattr(obj, 'cpu') and hasattr(obj, 'tolist'):  # torch tensor
         try:
             return obj.cpu().tolist()
-        except:
+        except (AttributeError, TypeError):
             return str(obj)
     elif hasattr(obj, 'item'):  # numpy scalar
         return obj.item()
