@@ -1,14 +1,15 @@
 # ML Inference Platform
 
-A scalable machine learning inference platform built with FastAPI and YOLO models.
+A pure ML inference platform built with FastAPI and YOLO models, optimized for production model serving.
 
 ## Features
 
 - High-performance inference API supporting both classification and detection
-- Model versioning with support for multiple YOLO model variants
+- Advanced model management with support for multiple concurrent models
+- Model loading, unloading, and switching capabilities
 - Scalable architecture with Kubernetes deployment options
 - Comprehensive metrics and monitoring
-- Thread-safe model loading with singleton pattern
+- Thread-safe model caching with LRU eviction
 - Support for various image input sources (URL, base64, file upload)
 
 ## Prerequisites
@@ -38,12 +39,15 @@ uvicorn app.main:app --reload --port 8000
 ## API Endpoints
 
 - `GET /` - Root endpoint
-- `GET /health` - Health check
+- `GET /health` - Health check (accepts optional model_path parameter)
 - `GET /metrics` - Service metrics
-- `POST /predict` - Main prediction endpoint
-- `POST /predict_async` - Async prediction endpoint
-- `POST /predict_file` - File upload prediction endpoint
-- `GET /model/info` - Model information
+- `POST /predict` - Main prediction endpoint (accepts optional model_path parameter)
+- `POST /predict_async` - Async prediction endpoint (accepts optional model_path parameter)
+- `POST /predict_file` - File upload prediction endpoint (accepts optional model_path parameter)
+- `GET /model/info` - Model information (accepts optional model_path parameter)
+- `GET /models` - List all currently loaded models
+- `POST /models/load/{model_name}` - Load a specific model into memory
+- `DELETE /models/unload/{model_name}` - Unload a specific model from memory
 
 ## Usage Examples
 
@@ -67,6 +71,16 @@ uvicorn app.main:app --reload --port 8000
 }
 ```
 
+### Using Specific Model
+To use a specific model, add the model_path parameter as a query parameter:
+
+`POST /predict?model_path=yolo11n.pt`
+
+### Managing Models
+- List loaded models: `GET /models`
+- Load a model: `POST /models/load/yolo11n-cls.pt`
+- Unload a model: `DELETE /models/unload/yolo11n-cls.pt`
+
 ## Docker Deployment
 
 Build and run with Docker:
@@ -86,7 +100,9 @@ kubectl apply -f k8s/
 
 The service can be configured using environment variables:
 
-- `MODEL_PATH`: Path to the YOLO model file (default: "yolo11n-cls.pt")
+- `MODEL_PATH`: Default path to the YOLO model file (default: "yolo11n-cls.pt")
+
+For production deployments, you can load models dynamically via the model management API endpoints.
 
 ## Development
 
