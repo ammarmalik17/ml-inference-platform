@@ -63,6 +63,7 @@ async def add_process_time_header(request, call_next):
     except Exception as e:
         process_time = time.time() - start_time
         record_request_metric(process_time, is_error=True)
+        logger.error(f"Request processing failed: {e}")
         raise
 
 
