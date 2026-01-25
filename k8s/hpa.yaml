@@ -8,11 +8,30 @@ spec:
     kind: Deployment
     name: ml-inference-app
   minReplicas: 1
-  maxReplicas: 10
+  maxReplicas: 5  # Reduced max replicas to prevent excessive resource usage
   metrics:
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 70
+        averageUtilization: 60  # Lower CPU threshold for ML workloads
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 75  # Lower memory threshold for ML workloads
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Longer stabilization window for ML workloads
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60

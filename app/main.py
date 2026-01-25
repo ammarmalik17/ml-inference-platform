@@ -1,15 +1,14 @@
 import time
 import logging
+import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, File, UploadFile
+from fastapi import FastAPI, HTTPException, File, UploadFile, Query
 from fastapi.responses import JSONResponse
 from typing import Dict, Any
-import asyncio
-from .dependencies import get_model
+from .dependencies import ModelRegistry
 from .schemas import PredictionRequest, PredictionResponse, HealthResponse
 from .inference import predict, predict_async
 from .metrics import collect_metrics, record_request_metric
-from ultralytics import YOLO
 
 
 # Configure logging
@@ -26,9 +25,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting ML Inference Service...")
     # Startup: Load model, initialize resources
     try:
-        # Trigger model loading during startup
-        registry = app.dependency_overrides.get(get_model, get_model)()
-        next(registry)  # Initialize model
+        # Initialize model registry during startup
+        registry = ModelRegistry()
+        model_path = os.getenv("MODEL_PATH", "model_files/yolo11n-cls.pt")
+        registry.get_model(model_path)  # Initialize default model
         logger.info("Model loaded successfully")
     except Exception as e:
         logger.error(f"Failed to load model: {e}")
@@ -38,6 +38,12 @@ async def lifespan(app: FastAPI):
     
     # Shutdown: Clean up resources
     logger.info("Shutting down ML Inference Service...")
+    try:
+        registry = ModelRegistry()
+        registry.clear_cache()  # Clear all loaded models
+        logger.info("Models cleared successfully")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
 
 
 app = FastAPI(
@@ -60,7 +66,7 @@ async def add_process_time_header(request, call_next):
             record_request_metric(process_time, is_error=response.status_code >= 400)
         response.headers["X-Process-Time"] = str(process_time)
         return response
-    except Exception as e:
+    except Exception:
         process_time = time.time() - start_time
         record_request_metric(process_time, is_error=True)
         logger.error(f"Request processing failed: {e}")
@@ -74,9 +80,12 @@ async def read_root():
 
 
 @app.get("/health", response_model=HealthResponse)
-async def health_check(model: YOLO = Depends(get_model)) -> HealthResponse:
+async def health_check(model_path: str = Query(None, description="Path to the model to check health for")) -> HealthResponse:
     """Health check endpoint to verify service status"""
     try:
+        # Get model based on path or default
+        registry = ModelRegistry()
+        model = registry.get_model(model_path)
         # Check if model is loaded and accessible
         model_loaded = model is not None
         model_version = getattr(model, 'names', {}).get(0, 'unknown') if model_loaded else None
@@ -103,12 +112,15 @@ async def get_metrics() -> Dict[str, Any]:
 @app.post("/predict", response_model=PredictionResponse)
 async def predict_endpoint(
     request: PredictionRequest,
-    model: YOLO = Depends(get_model)
+    model_path: str = Query(None, description="Path to the model to use for prediction")
 ) -> PredictionResponse:
     """
     Main prediction endpoint for image classification and detection
     """
     try:
+        # Get model based on path or default
+        registry = ModelRegistry()
+        model = registry.get_model(model_path)
         result = predict(model, request)
         return result
     except Exception as e:
@@ -120,12 +132,15 @@ async def predict_endpoint(
 @app.post("/predict_async", response_model=PredictionResponse)
 async def predict_async_endpoint(
     request: PredictionRequest,
-    model: YOLO = Depends(get_model)
+    model_path: str = Query(None, description="Path to the model to use for prediction")
 ) -> PredictionResponse:
     """
     Async prediction endpoint for image classification and detection
     """
     try:
+        # Get model based on path or default
+        registry = ModelRegistry()
+        model = registry.get_model(model_path)
         result = await predict_async(model, request)
         return result
     except Exception as e:
@@ -139,7 +154,7 @@ async def predict_file_endpoint(
     file: UploadFile = File(...),
     task_type: str = "classification",
     confidence_threshold: float = 0.25,
-    model: YOLO = Depends(get_model)
+    model_path: str = Query(None, description="Path to the model to use for prediction")
 ) -> PredictionResponse:
     """
     Prediction endpoint that accepts uploaded image files
@@ -157,6 +172,9 @@ async def predict_file_endpoint(
             confidence_threshold=confidence_threshold
         )
         
+        # Get model based on path or default
+        registry = ModelRegistry()
+        model = registry.get_model(model_path)
         result = predict(model, request)
         return result
     except Exception as e:
@@ -176,12 +194,72 @@ async def general_exception_handler(request, exc):
 
 
 # Additional utility endpoints
+def convert_tensor_to_serializable(obj):
+    """Convert torch tensors and other non-serializable objects to serializable types"""
+    if hasattr(obj, 'cpu') and hasattr(obj, 'tolist'):  # torch tensor
+        try:
+            return obj.cpu().tolist()
+        except (AttributeError, TypeError):
+            return str(obj)
+    elif hasattr(obj, 'item'):  # numpy scalar
+        return obj.item()
+    elif isinstance(obj, dict):
+        return {k: convert_tensor_to_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_tensor_to_serializable(item) for item in obj]
+    else:
+        return obj
+
 @app.get("/model/info")
-async def model_info(model: YOLO = Depends(get_model)) -> Dict[str, Any]:
-    """Get information about the loaded model"""
+async def model_info(model_path: str = Query(None, description="Path to the model to get info for")) -> Dict[str, Any]:
+    """Get information about the currently active model"""
+    # Get model based on path or default
+    registry = ModelRegistry()
+    model = registry.get_model(model_path)
     return {
         "model_type": type(model).__name__,
         "model_names": model.names if hasattr(model, 'names') else {},
-        "task": getattr(model, 'task', 'unknown'),
-        "stride": getattr(model, 'stride', 'unknown')
+        "task": convert_tensor_to_serializable(getattr(model, 'task', 'unknown')),
+        "stride": convert_tensor_to_serializable(getattr(model, 'stride', 'unknown'))
     }
+
+
+@app.get("/models")
+async def list_models() -> Dict[str, Any]:
+    """List all currently loaded models"""
+    registry = ModelRegistry()
+    loaded_models = registry.list_models()
+    return {
+        "loaded_models": loaded_models,
+        "count": len(loaded_models)
+    }
+
+
+@app.post("/models/load/{model_name}")
+async def load_model(model_name: str) -> Dict[str, Any]:
+    """Load a specific model into memory"""
+    try:
+        registry = ModelRegistry()
+        registry.load_model(model_name)
+        return {
+            "status": "success",
+            "model_loaded": model_name,
+            "message": f"Model {model_name} loaded successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to load model {model_name}: {str(e)}")
+
+
+@app.delete("/models/unload/{model_name}")
+async def unload_model(model_name: str) -> Dict[str, Any]:
+    """Unload a specific model from memory"""
+    registry = ModelRegistry()
+    success = registry.unload_model(model_name)
+    if success:
+        return {
+            "status": "success",
+            "model_unloaded": model_name,
+            "message": f"Model {model_name} unloaded successfully"
+        }
+    else:
+        raise HTTPException(status_code=404, detail=f"Model {model_name} not found in memory")

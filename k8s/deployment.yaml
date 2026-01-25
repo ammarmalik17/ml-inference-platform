@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ml-inference-app
+  labels:
+    app: ml-inference-app
 spec:
   replicas: 1
   selector:
@@ -15,5 +17,48 @@ spec:
       containers:
       - name: ml-inference-app
         image: ml-inference-app:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
+        env:
+        - name: MODEL_PATH
+          value: "model_files/yolo11n-cls.pt"  # Updated model path to use model_files directory
+        - name: UVICORN_HOST
+          value: "0.0.0.0"
+        - name: UVICORN_PORT
+          value: "8000"
+        resources:
+          requests:
+            memory: "1Gi"  # Increased for ML model loading
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"  # Increased for ML model processing
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60  # Increased for model loading time
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10  # Increased for model loading time
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: model-storage
+          mountPath: /app/model_files
+        - name: shared-memory
+          mountPath: /dev/shm
+      volumes:
+      - name: model-storage
+        emptyDir: {}
+      - name: shared-memory
+        emptyDir:
+          medium: Memory
+          sizeLimit: 1Gi

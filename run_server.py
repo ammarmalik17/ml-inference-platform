@@ -18,7 +18,7 @@ def main():
     
     # Set environment variable for model path if not set
     if not os.environ.get("MODEL_PATH"):
-        os.environ["MODEL_PATH"] = "yolo11n-cls.pt"  # Default to smallest YOLO model
+        os.environ["MODEL_PATH"] = "model_files/yolo11n-cls.pt"  # Default to smallest YOLO model in model_files directory
     
     print(f"Starting ML Inference Platform on {args.host}:{args.port}")
     print(f"Using model: {os.environ['MODEL_PATH']}")
